@@ -1,0 +1,6 @@
+# Plugins que serão instalados para serem utilizados pelo kong
+plugins:
+  - name: "kong-plugin-jwt"
+    version: "1.0.0"
+  - name: "kong-plugin-cors"
+    version: "2.0.0"

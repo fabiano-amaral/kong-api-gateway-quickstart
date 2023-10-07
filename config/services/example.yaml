@@ -1,0 +1,10 @@
+_format_version: "3.0"
+_transform: false
+
+services:
+- name: meu-servico
+  url: https://mockbin.org
+  routes:
+  - name: rota-para-meu-servico
+    paths:
+    - "/meu-servico"

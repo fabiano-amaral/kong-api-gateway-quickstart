@@ -1,0 +1,7 @@
+_format_version: "3.0"
+_transform: false
+
+plugins:
+- name: rate-limiting
+  config:
+    second: 5

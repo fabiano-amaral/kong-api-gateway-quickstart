@@ -1,0 +1,100 @@
+version: '3'
+
+volumes:
+  certs:
+
+
+networks:
+  kong-net:
+
+services:
+  # gera o certificado de comunicação entre data e control plane
+  generate-certs:
+    image: alpine
+    command: sh -c "apk add openssl && openssl req -new -x509 -nodes -newkey ec:<(openssl ecparam -name secp384r1) -keyout /tmp/cluster.key -out /tmp/cluster.crt   -days 1095 -subj '/CN=kong_clustering' && chmod 644 /tmp/cluster.key /tmp/cluster.crt"
+    volumes:
+      - certs:/tmp
+
+  kong-migrations:
+    image: kong:3
+    networks:
+        - kong-net
+    command: "kong migrations bootstrap"
+    environment:
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kong
+    volumes:
+      - certs:/certs
+    depends_on:
+      kong-database:
+        condition: service_healthy
+
+  kong-control-plane:
+    build: .
+    command: kong start --vv
+    networks:
+        - kong-net
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+    environment:
+      - KONG_ROLE=control_plane
+      - KONG_DATABASE=postgres
+      - KONG_PG_HOST=kong-database
+      - KONG_PG_USER=kong
+      - KONG_PG_PASSWORD=kong
+      - KONG_ADMIN_LISTEN=0.0.0.0:8001
+      - KONG_CLUSTER_CERT=certs/cluster.crt
+      - KONG_CLUSTER_CERT_KEY=certs/cluster.key
+      - KONG_ADMIN_GUI_URL=http://localhost:8002
+      - KONG_CLUSTER_LISTEN=0.0.0.0:8005
+      - KONG_ADMIN_GUI_LISTEN=0.0.0.0:8002
+    volumes:
+      - certs:/certs
+      - ./scripts/init-kong.sh:/init-kong.sh
+      - ./config:/etc/kong/config
+    ports:
+      - 8001:8001
+      - 8002:8002
+    depends_on:
+      generate-certs:
+        condition: service_completed_successfully
+      kong-migrations:
+        condition: service_completed_successfully
+
+  kong-data-plane:
+    image: kong:3
+    networks:
+        - kong-net
+    environment:
+      - KONG_ROLE=data_plane
+      - KONG_DATABASE=off
+      - KONG_CLUSTER_CONTROL_PLANE=kong-control-plane:8005
+      - KONG_CLUSTER_CERT=certs/cluster.crt
+      - KONG_CLUSTER_CERT_KEY=certs/cluster.key
+    volumes:
+      - certs:/certs
+    ports:
+      - 8000:8000
+      - 8443:8443
+    depends_on:
+      kong-control-plane:
+        condition: service_healthy
+
+  kong-database:
+    image: postgres:15-alpine
+    networks:
+        - kong-net
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kong"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    environment:
+      POSTGRES_DB: kong
+      POSTGRES_USER: kong
+      POSTGRES_PASSWORD: kong
