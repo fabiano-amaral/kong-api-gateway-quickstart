@@ -1,8 +1,5 @@
-version: '3'
-
 volumes:
   certs:
-
 
 networks:
   kong-net:
@@ -33,7 +30,7 @@ services:
 
   kong-control-plane:
     build: .
-    command: kong start --vv
+    # command: kong start --vvv
     networks:
         - kong-net
     healthcheck:
@@ -53,6 +50,11 @@ services:
       - KONG_ADMIN_GUI_URL=http://localhost:8002
       - KONG_CLUSTER_LISTEN=0.0.0.0:8005
       - KONG_ADMIN_GUI_LISTEN=0.0.0.0:8002
+      - KONG_PLUGINS=bundled,custom-header
+      - KONG_PLUGINSERVER_NAMES=custom-header
+      - KONG_PLUGINSERVER_CUSTOM_HEADER_START_CMD=/usr/local/bin/custom-header
+      - KONG_PLUGINSERVER_CUSTOM_HEADER_QUERY_CMD=/usr/local/bin/custom-header -dump
+
     volumes:
       - certs:/certs
       - ./scripts/init-kong.sh:/init-kong.sh
@@ -67,7 +69,8 @@ services:
         condition: service_completed_successfully
 
   kong-data-plane:
-    image: kong:3
+    build: .
+    command: /docker-entrypoint.sh kong docker-start
     networks:
         - kong-net
     environment:
@@ -76,6 +79,11 @@ services:
       - KONG_CLUSTER_CONTROL_PLANE=kong-control-plane:8005
       - KONG_CLUSTER_CERT=certs/cluster.crt
       - KONG_CLUSTER_CERT_KEY=certs/cluster.key
+      - KONG_PLUGINS=bundled,custom-header
+      - KONG_PLUGINSERVER_NAMES=custom-header
+      - KONG_PLUGINSERVER_CUSTOM_HEADER_START_CMD=/usr/local/bin/custom-header
+      - KONG_PLUGINSERVER_CUSTOM_HEADER_QUERY_CMD=/usr/local/bin/custom-header -dump
+
     volumes:
       - certs:/certs
     ports:

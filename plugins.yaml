@@ -4,3 +4,5 @@ plugins:
     version: "1.0.0"
   - name: "kong-plugin-cors"
     version: "2.0.0"
+  - name: "custom-header"
+    version: "0.1"
