@@ -11,7 +11,13 @@ USER root
 # Copiar o script para o contêiner e permissão
 COPY ./scripts/init-kong.sh /init-kong.sh
 RUN chmod +x /init-kong.sh
-USER 1000
+
+# Criar o diretório de sockets e ajustar permissões para o usuário 'kong'
+# O usuário 'kong' (UID 999) é o usuário padrão que o processo Kong executa como na imagem base.
+RUN mkdir -p /usr/local/kong/sockets && \
+    chown -R kong:kong /usr/local/kong && \
+    chmod -R u+rwx /usr/local/kong # Garante que o proprietário (kong) tenha rwx
+
 
 COPY ./config /etc/kong/config
 
